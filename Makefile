@@ -1,12 +1,40 @@
 EE_BIN = liero.elf
-EE_OBJS = main.o
 
-EE_LIBS = -lgs -ldmakit -lkernel
+SRCS = main.c \
+       world.c \
+       player.c \
+       weapon.c \
+       projectile.c \
+       render.c \
+       input.c \
+       particles.c
+
+OBJS = $(SRCS:.c=.o)
+
+PS2DEV ?= /usr/local/ps2dev
+PS2SDK ?= $(PS2DEV)/ps2sdk
+GSKIT  ?= $(PS2DEV)/gsKit
+
+CC     = mips64r5900el-ps2-elf-gcc
+CFLAGS = -O2 -G0 -D_EE \
+         -I$(PS2SDK)/ee/include \
+         -I$(PS2SDK)/common/include \
+         -I$(GSKIT)/include \
+         -I.
+
+LDFLAGS = -T$(PS2SDK)/ee/startup/linkfile \
+          -L$(PS2SDK)/ee/lib \
+          -L$(GSKIT)/lib
+
+LIBS = -lgskit -ldmakit -lpad -lcglue -lkernel -lc -lm -lgcc
 
 all: $(EE_BIN)
 
-$(EE_BIN): $(EE_OBJS)
-	$(EE_CC) $(EE_CFLAGS) -o $@ $^ $(EE_LIBS)
+$(EE_BIN): $(OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	rm -f $(EE_BIN) $(EE_OBJS)
+	rm -f $(OBJS) $(EE_BIN)
