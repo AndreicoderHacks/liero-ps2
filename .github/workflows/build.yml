@@ -1,0 +1,40 @@
+name: PS2 Build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git build-essential cmake
+
+      - name: Setup PS2DEV
+        run: |
+          git clone https://github.com/ps2dev/ps2dev.git
+          cd ps2dev
+          export PS2DEV=$PWD
+          export PS2SDK=$PWD/ps2sdk
+          export PATH=$PATH:$PS2DEV/bin
+          ./build-all.sh
+          echo "PS2DEV=$PS2DEV" >> $GITHUB_ENV
+          echo "PS2SDK=$PS2SDK" >> $GITHUB_ENV
+          echo "$PS2DEV/bin" >> $GITHUB_PATH
+
+      - name: Build project
+        run: |
+          make
+
+      - name: Upload ELF
+        uses: actions/upload-artifact@v4
+        with:
+          name: liero-ps2
+          path: liero.elf
