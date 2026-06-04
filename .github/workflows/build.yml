@@ -8,32 +8,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    container:
+      image: ps2dev/ps2dev:latest
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-
-      - name: Install deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y git build-essential make gcc g++ wget
-
-      - name: Clone PS2DEV
-        run: |
-          git clone https://github.com/ps2dev/ps2dev.git
-          echo "PS2DEV=$PWD/ps2dev" >> $GITHUB_ENV
-          echo "PATH=$PWD/ps2dev/ee/bin:$PWD/ps2dev/iop/bin:$PATH" >> $GITHUB_ENV
-
-      - name: Build PS2DEV (safe way)
-        run: |
-          cd ps2dev
-          make toolchain
-          make ps2sdk
-
-      - name: Export env again
-        run: |
-          echo "PS2DEV=$PWD/ps2dev" >> $GITHUB_ENV
-          echo "PS2SDK=$PWD/ps2dev/ps2sdk" >> $GITHUB_ENV
-          echo "$PWD/ps2dev/ee/bin" >> $GITHUB_PATH
 
       - name: Build project
         run: |
