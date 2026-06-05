@@ -47,8 +47,8 @@ int main(void) {
     // Init GS cu Interlace + Field — fix pentru PS2 real
     GSGLOBAL *gsGlobal        = gsKit_init_global();
     gsGlobal->Mode            = GS_MODE_NTSC;
-    gsGlobal->Interlace       = GS_INTERLACE_ON;
-    gsGlobal->Field           = GS_FIELD_EVEN;
+    gsGlobal->Interlace       = GS_INTERLACED;
+    gsGlobal->Field           = GS_FIELD;
     gsGlobal->Width           = SCREEN_W;
     gsGlobal->Height          = SCREEN_H;
     gsGlobal->PSM             = GS_PSM_CT32;
