@@ -142,20 +142,37 @@ static void render_world(GSGLOBAL *g, GameState *gs, int camX, int camY) {
     if (startX < 0) startX = 0;
     if (startY < 0) startY = 0;
 
+    // Run-length encoding orizontal — reduce draw calls de la 286720 la ~500
     for (sy = 0; sy < SCREEN_H; sy++) {
         int wy = startY + sy;
         if (wy >= WORLD_H) break;
-        for (sx = 0; sx < SCREEN_W; sx++) {
-            int wx = startX + sx;
-            if (wx >= WORLD_W) break;
-            int idx = wy * WORLD_W + wx;
-            if (gs->world.solid[idx]) {
-                u64 col = terrain_color(gs->world.color[idx]);
-                // Desenam pixel ca dreptunghi 1x1
+
+        int run_start = -1;
+        u64 run_col   = 0;
+
+        for (sx = 0; sx <= SCREEN_W; sx++) {
+            int wx    = startX + sx;
+            int solid = 0;
+            u64 col   = 0;
+
+            if (sx < SCREEN_W && wx < WORLD_W) {
+                int idx = wy * WORLD_W + wx;
+                if (gs->world.solid[idx]) {
+                    solid = 1;
+                    col   = terrain_color(gs->world.color[idx]);
+                }
+            }
+
+            if (solid && run_start < 0) {
+                run_start = sx;
+                run_col   = col;
+            } else if (run_start >= 0 && (!solid || col != run_col)) {
                 gsKit_prim_sprite(g,
-                    (float)sx,       (float)sy,
-                    (float)(sx + 1), (float)(sy + 1),
-                    1, col);
+                    (float)run_start, (float)sy,
+                    (float)sx,        (float)(sy + 1),
+                    1, run_col);
+                run_start = solid ? sx : -1;
+                run_col   = col;
             }
         }
     }
