@@ -1,11 +1,6 @@
 #ifndef LIERO_H
 #define LIERO_H
 
-// ============================================================
-//  LIERO PS2
-//  Header central — structuri, constante, declaratii functii
-// ============================================================
-
 #include <tamtypes.h>
 #include <kernel.h>
 #include <sifrpc.h>
@@ -19,7 +14,6 @@
 #include <stdio.h>
 #include <math.h>
 
-// ---- PS2 Controller button masks ----
 #ifndef PAD_SELECT
 #define PAD_SELECT      0x0001
 #define PAD_L3          0x0002
@@ -42,33 +36,27 @@
 // ============================================================
 //  SCREEN & WORLD
 // ============================================================
-
 #define SCREEN_W        640
 #define SCREEN_H        448
-
-// Lumea e un bitmap de pixeli solizi/goi
-// 1 = solid (pamant), 0 = gol (aer)
 #define WORLD_W         640
 #define WORLD_H         360
 
 // ============================================================
 //  GAME CONSTANTS
 // ============================================================
+#define MAX_PLAYERS         2
+#define MAX_PROJECTILES     64
+#define MAX_PARTICLES       256
+#define WEAPONS_PER_PLAYER  5
 
-#define MAX_PLAYERS     2
-#define MAX_PROJECTILES 64
-#define MAX_PARTICLES   256
-
-#define GRAVITY         1        // pixeli/tick^2 (fixed point /16)
+#define GRAVITY         1
 #define PLAYER_SPEED    3
 #define JUMP_FORCE      -10
-
-#define ROUND_TIME      (60 * 60)   // 60 secunde la 60fps
+#define ROUND_TIME      (60 * 60)
 
 // ============================================================
 //  GAME STATES
 // ============================================================
-
 #define STATE_MENU       0
 #define STATE_PLAYING    1
 #define STATE_ROUND_END  2
@@ -77,7 +65,6 @@
 // ============================================================
 //  ARME
 // ============================================================
-
 #define WEAPON_PISTOL    0
 #define WEAPON_SHOTGUN   1
 #define WEAPON_BAZOOKA   2
@@ -86,9 +73,17 @@
 #define WEAPON_COUNT     5
 
 // ============================================================
-//  CULORI (GS format RGBA, alpha 0x80 = opac)
+//  MENIU
 // ============================================================
+#define MENU_PHASE_MAIN       0
+#define MENU_PHASE_P1_SELECT  1
+#define MENU_PHASE_P2_SELECT  2
 
+#define PAUSE_OPTS      5
+
+// ============================================================
+//  CULORI
+// ============================================================
 #define COL_BLACK       GS_SETREG_RGBAQ(0,   0,   0,   0x80, 0)
 #define COL_WHITE       GS_SETREG_RGBAQ(255, 255, 255, 0x80, 0)
 #define COL_RED         GS_SETREG_RGBAQ(220, 40,  40,  0x80, 0)
@@ -101,35 +96,28 @@
 #define COL_BROWN       GS_SETREG_RGBAQ(120, 70,  30,  0x80, 0)
 #define COL_DIRT        GS_SETREG_RGBAQ(100, 60,  20,  0x80, 0)
 #define COL_SKY         GS_SETREG_RGBAQ(20,  20,  40,  0x80, 0)
-
-// Culori jucatori
-#define COL_P1          GS_SETREG_RGBAQ(255, 80,  80,  0x80, 0)   // rosu
-#define COL_P2          GS_SETREG_RGBAQ(80,  80,  255, 0x80, 0)   // albastru
+#define COL_P1          GS_SETREG_RGBAQ(255, 80,  80,  0x80, 0)
+#define COL_P2          GS_SETREG_RGBAQ(80,  80,  255, 0x80, 0)
 
 // ============================================================
-//  STRUCTURI DE DATE
+//  STRUCTURI
 // ============================================================
 
-// ---- Lumea (teren destructibil) ----
 typedef struct {
-    // Fiecare bit = 1 pixel: 1 solid, 0 gol
-    // 640 * 360 = 230400 bytes ~ 225 KB — incape in RAM PS2
     u8 solid[WORLD_W * WORLD_H];
-    u8 color[WORLD_W * WORLD_H];   // culoarea fiecarui pixel de teren
+    u8 color[WORLD_W * WORLD_H];
 } World;
 
-// ---- Proiectil ----
 typedef struct {
     int   alive;
-    int   x, y;          // pozitie (fixed point *16)
-    int   vx, vy;        // viteza (fixed point *16)
-    int   owner;         // 0 = P1, 1 = P2
-    int   weapon;        // tipul armei (pentru damage + explozie)
-    int   timer;         // grenade countdown
+    int   x, y;
+    int   vx, vy;
+    int   owner;
+    int   weapon;
+    int   timer;
     u64   color;
 } Projectile;
 
-// ---- Particula ----
 typedef struct {
     int   alive;
     int   x, y;
@@ -138,50 +126,56 @@ typedef struct {
     u64   color;
 } Particle;
 
-// ---- Jucator ----
 typedef struct {
     int   alive;
-    int   x, y;          // pozitie (fixed point *16)
-    int   vx, vy;        // viteza (fixed point *16)
+    int   x, y;
+    int   vx, vy;
     int   health;
     int   maxHealth;
-    int   dir;           // 0 = stanga, 1 = dreapta
-    int   aimAngle;      // unghi tintire (0-255, mapat la 0-360)
-    int   selectedWeapon;
+    int   dir;
+    int   aimAngle;
+    int   weapons[WEAPONS_PER_PLAYER];   // armele alese in meniu
+    int   weaponCount;
+    int   selectedWeapon;                // index in weapons[]
     int   fireCooldown;
     int   onGround;
-    int   padIndex;      // 0 = pad1, 1 = pad2
+    int   padIndex;
     int   hurtTimer;
 } Player;
 
-// ---- Input ----
 typedef struct {
     u32   current[MAX_PLAYERS];
     u32   prev[MAX_PLAYERS];
-    int   analogLX[MAX_PLAYERS];   // -128 .. 127
+    int   analogLX[MAX_PLAYERS];
     int   analogLY[MAX_PLAYERS];
     int   analogRX[MAX_PLAYERS];
     int   analogRY[MAX_PLAYERS];
 } InputState;
 
-// ---- GameState (tot ce tine de joc) ----
+typedef struct {
+    int   phase;                                        // MENU_PHASE_*
+    int   mainCursor;
+    int   weaponCursor[MAX_PLAYERS];
+    int   selectedWeapons[MAX_PLAYERS][WEAPONS_PER_PLAYER];
+    int   weaponSlotFilled[MAX_PLAYERS][WEAPONS_PER_PLAYER];
+    int   pauseCursor;
+} MenuState;
+
 typedef struct {
     int         state;
     int         tickCount;
     int         roundTimer;
-    int         winner;       // 0 sau 1, valid cand state == STATE_ROUND_END
+    int         winner;
+    int         volume;         // 0-10
 
     World       world;
-
     Player      players[MAX_PLAYERS];
-
     Projectile  projectiles[MAX_PROJECTILES];
     int         projectileCount;
-
     Particle    particles[MAX_PARTICLES];
     int         particleCount;
-
     InputState  input;
+    MenuState   menu;
 } GameState;
 
 // ============================================================
@@ -190,8 +184,8 @@ typedef struct {
 
 // main.c
 void game_init(GameState *gs);
+void game_start(GameState *gs);   // porneste runda cu armele alese
 void game_tick(GameState *gs);
-void game_render(GameState *gs, GSGLOBAL *gsGlobal);
 
 // world.c
 void world_generate(World *w);
@@ -234,9 +228,10 @@ void particle_spawn(GameState *gs, int x, int y, int vx, int vy,
                     u64 color, int life);
 void particle_tickAll(GameState *gs);
 
-// utils
-int  rng_next(void);
-void rng_seed(unsigned int s);
-int  rng_range(int min, int max);
+// menu.c
+void menu_tick(GameState *gs);
+void menu_render(GSGLOBAL *g, GameState *gs);
+void pause_tick(GameState *gs);
+void pause_render(GSGLOBAL *g, GameState *gs);
 
-#endif // LIERO_H
+#endif

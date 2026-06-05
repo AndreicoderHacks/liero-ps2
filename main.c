@@ -2,41 +2,83 @@
 
 static GameState gs;
 
+// ------------------------------------------------------------
+//  game_init — initializare completa (prima data)
+// ------------------------------------------------------------
 void game_init(GameState *g) {
     memset(g, 0, sizeof(GameState));
+    g->state        = STATE_MENU;
+    g->volume       = 7;
+    g->menu.phase   = MENU_PHASE_MAIN;
+}
 
-    // Teren simplu — fara generare procedurala, doar umplem jumatatea de jos
+// ------------------------------------------------------------
+//  game_start — porneste runda cu armele alese din meniu
+// ------------------------------------------------------------
+void game_start(GameState *g) {
+    int i;
+
+    // Teren plat simplu
     int x, y;
+    memset(&g->world, 0, sizeof(World));
     for (y = 0; y < WORLD_H; y++) {
         for (x = 0; x < WORLD_W; x++) {
             if (y > WORLD_H / 2) {
                 g->world.solid[y * WORLD_W + x] = 1;
-                g->world.color[y * WORLD_W + x] = 2; // roca
+                g->world.color[y * WORLD_W + x] = 2;
             }
         }
     }
 
+    // Spawn jucatori
     player_init(&g->players[0], 100, WORLD_H/2 - 20, 0);
     player_init(&g->players[1], 500, WORLD_H/2 - 20, 1);
-    g->players[0].selectedWeapon = WEAPON_PISTOL;
-    g->players[1].selectedWeapon = WEAPON_PISTOL;
-    g->state      = STATE_PLAYING;
-    g->roundTimer = ROUND_TIME;
+
+    // Copiem armele alese din meniu in player
+    for (i = 0; i < WEAPONS_PER_PLAYER; i++) {
+        g->players[0].weapons[i] = g->menu.selectedWeapons[0][i];
+        g->players[1].weapons[i] = g->menu.selectedWeapons[1][i];
+    }
+    g->players[0].weaponCount    = WEAPONS_PER_PLAYER;
+    g->players[1].weaponCount    = WEAPONS_PER_PLAYER;
+    g->players[0].selectedWeapon = 0;
+    g->players[1].selectedWeapon = 0;
+
+    g->projectileCount = 0;
+    g->particleCount   = 0;
+    g->tickCount       = 0;
+    g->roundTimer      = ROUND_TIME;
+    g->state           = STATE_PLAYING;
 }
 
+// ------------------------------------------------------------
+//  game_tick
+// ------------------------------------------------------------
 void game_tick(GameState *g) {
     if (g->state != STATE_PLAYING) return;
+
     g->tickCount++;
     player_tick(g, 0);
     player_tick(g, 1);
     projectile_tickAll(g);
     particle_tickAll(g);
+
     if (g->roundTimer > 0) g->roundTimer--;
     else g->state = STATE_ROUND_END;
+
     if (!g->players[0].alive) { g->winner = 1; g->state = STATE_ROUND_END; }
     if (!g->players[1].alive) { g->winner = 0; g->state = STATE_ROUND_END; }
+
+    // Start = pauza in joc
+    if (input_pressed(g, 0, PAD_START) || input_pressed(g, 1, PAD_START)) {
+        g->state = STATE_PAUSED;
+        g->menu.pauseCursor = 0;
+    }
 }
 
+// ------------------------------------------------------------
+//  main
+// ------------------------------------------------------------
 int main(void) {
     SifInitRpc(0);
 
@@ -57,7 +99,7 @@ int main(void) {
     gsGlobal->PrimAlphaEnable = GS_SETTING_OFF;
 
     gsKit_init_screen(gsGlobal);
-    gsKit_mode_switch(gsGlobal, GS_ONESHOT);
+    gsKit_mode_switch(gsGlobal, GS_PERSISTENT);
 
     input_init();
     game_init(&gs);
@@ -65,15 +107,33 @@ int main(void) {
     while (1) {
         input_update(&gs);
 
-        if (gs.state == STATE_ROUND_END) {
-            if (input_pressed(&gs, 0, PAD_START) ||
-                input_pressed(&gs, 1, PAD_START)) {
-                game_init(&gs);
-            }
-        }
+        switch (gs.state) {
+            case STATE_MENU:
+                menu_tick(&gs);
+                menu_render(gsGlobal, &gs);
+                break;
 
-        game_tick(&gs);
-        game_render(&gs, gsGlobal);
+            case STATE_PLAYING:
+                game_tick(&gs);
+                game_render(&gs, gsGlobal);
+                break;
+
+            case STATE_PAUSED:
+                pause_tick(&gs);
+                game_render(&gs, gsGlobal);   // jocul in fundal
+                pause_render(gsGlobal, &gs);
+                break;
+
+            case STATE_ROUND_END:
+                game_render(&gs, gsGlobal);
+                // Start = inapoi la meniu
+                if (input_pressed(&gs, 0, PAD_START) ||
+                    input_pressed(&gs, 1, PAD_START)) {
+                    gs.state      = STATE_MENU;
+                    gs.menu.phase = MENU_PHASE_MAIN;
+                }
+                break;
+        }
 
         gsKit_queue_exec(gsGlobal);
         gsKit_sync_flip(gsGlobal);

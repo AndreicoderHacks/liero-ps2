@@ -1,6 +1,6 @@
 EE_BIN = liero.elf
 
-SRCS = main.c \
+SRCS = main.c menu.c \
        world.c \
        player.c \
        weapon.c \
