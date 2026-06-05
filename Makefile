@@ -1,6 +1,6 @@
 EE_BIN = liero.elf
 
-SRCS = main.c menu.c \
+SRCS = main.c menu.c sfx.c \
        world.c \
        player.c \
        weapon.c \
@@ -26,7 +26,7 @@ LDFLAGS = -T$(PS2SDK)/ee/startup/linkfile \
           -L$(PS2SDK)/ee/lib \
           -L$(GSKIT)/lib
 
-LIBS = -lgskit -ldmakit -lpad -lcglue -lkernel -lc -lm -lgcc
+LIBS = -lgskit -ldmakit -lpad -laudsrv -lcglue -lkernel -lc -lm -lgcc
 
 all: $(EE_BIN)
 

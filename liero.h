@@ -47,7 +47,7 @@
 #define MAX_PLAYERS         2
 #define MAX_PROJECTILES     64
 #define MAX_PARTICLES       256
-#define WEAPONS_PER_PLAYER  5
+#define WEAPONS_PER_PLAYER  2
 
 #define GRAVITY         1
 #define PLAYER_SPEED    3
@@ -71,6 +71,18 @@
 #define WEAPON_GRENADE   3
 #define WEAPON_MINIGUN   4
 #define WEAPON_COUNT     5
+
+// ============================================================
+//  SFX
+// ============================================================
+#define SFX_NAVIGATE  0
+#define SFX_SELECT    1
+#define SFX_BACK      2
+#define SFX_SHOOT     3
+#define SFX_EXPLODE   4
+#define SFX_HURT      5
+#define SFX_COUNT     6
+#define MAX_VOLUME    127
 
 // ============================================================
 //  MENIU

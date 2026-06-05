@@ -102,6 +102,7 @@ int main(void) {
     gsKit_mode_switch(gsGlobal, GS_PERSISTENT);
 
     input_init();
+    sfx_init();
     game_init(&gs);
 
     while (1) {
