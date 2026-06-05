@@ -246,4 +246,9 @@ void menu_render(GSGLOBAL *g, GameState *gs);
 void pause_tick(GameState *gs);
 void pause_render(GSGLOBAL *g, GameState *gs);
 
+// sfx.c
+void sfx_init(void);
+void sfx_play(GameState *gs, int sfx_id);
+void sfx_set_volume(GameState *gs);
+
 #endif
