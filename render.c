@@ -142,16 +142,17 @@ static void render_world(GSGLOBAL *g, GameState *gs, int camX, int camY) {
     if (startX < 0) startX = 0;
     if (startY < 0) startY = 0;
 
-    // Run-length encoding orizontal — reduce draw calls de la 286720 la ~500
-    for (sy = 0; sy < SCREEN_H; sy++) {
-        int wy = startY + sy;
+    // Desenam linie cu linie, fiecare pixel = 2x2 pe ecran
+    // Citim din 2 in 2 pixeli => de 4x mai putine draw calls
+    for (sy = 0; sy < SCREEN_H; sy += 2) {
+        int wy = startY + (sy >> 1);
         if (wy >= WORLD_H) break;
 
         int run_start = -1;
         u64 run_col   = 0;
 
-        for (sx = 0; sx <= SCREEN_W; sx++) {
-            int wx    = startX + sx;
+        for (sx = 0; sx <= SCREEN_W; sx += 2) {
+            int wx    = startX + (sx >> 1);
             int solid = 0;
             u64 col   = 0;
 
@@ -169,7 +170,7 @@ static void render_world(GSGLOBAL *g, GameState *gs, int camX, int camY) {
             } else if (run_start >= 0 && (!solid || col != run_col)) {
                 gsKit_prim_sprite(g,
                     (float)run_start, (float)sy,
-                    (float)sx,        (float)(sy + 1),
+                    (float)sx,        (float)(sy + 2),
                     1, run_col);
                 run_start = solid ? sx : -1;
                 run_col   = col;
@@ -328,6 +329,7 @@ void game_render(GameState *gs, GSGLOBAL *g) {
     if (camY > WORLD_H - SCREEN_H / 2) camY = WORLD_H - SCREEN_H / 2;
 
     render_world(g, gs, camX, camY);
+    gsKit_queue_exec(g);   // flush dupa teren
     render_particles(g, gs, camX, camY);
     render_projectiles(g, gs, camX, camY);
     render_player(g, &gs->players[0], camX, camY, 0);
