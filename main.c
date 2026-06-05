@@ -1,8 +1,41 @@
 #include "liero.h"
 
-// TEST MINIMAL — doar gsKit init + dreptunghi rosu pe ecran
-// Daca merge => problema e in game_init/world_generate
-// Daca nu merge => problema e in gsKit init
+static GameState gs;
+
+void game_init(GameState *g) {
+    memset(g, 0, sizeof(GameState));
+
+    // Teren simplu — fara generare procedurala, doar umplem jumatatea de jos
+    int x, y;
+    for (y = 0; y < WORLD_H; y++) {
+        for (x = 0; x < WORLD_W; x++) {
+            if (y > WORLD_H / 2) {
+                g->world.solid[y * WORLD_W + x] = 1;
+                g->world.color[y * WORLD_W + x] = 2; // roca
+            }
+        }
+    }
+
+    player_init(&g->players[0], 100, WORLD_H/2 - 20, 0);
+    player_init(&g->players[1], 500, WORLD_H/2 - 20, 1);
+    g->players[0].selectedWeapon = WEAPON_PISTOL;
+    g->players[1].selectedWeapon = WEAPON_PISTOL;
+    g->state      = STATE_PLAYING;
+    g->roundTimer = ROUND_TIME;
+}
+
+void game_tick(GameState *g) {
+    if (g->state != STATE_PLAYING) return;
+    g->tickCount++;
+    player_tick(g, 0);
+    player_tick(g, 1);
+    projectile_tickAll(g);
+    particle_tickAll(g);
+    if (g->roundTimer > 0) g->roundTimer--;
+    else g->state = STATE_ROUND_END;
+    if (!g->players[0].alive) { g->winner = 1; g->state = STATE_ROUND_END; }
+    if (!g->players[1].alive) { g->winner = 0; g->state = STATE_ROUND_END; }
+}
 
 int main(void) {
     SifInitRpc(0);
@@ -15,8 +48,8 @@ int main(void) {
     gsGlobal->Mode            = GS_MODE_NTSC;
     gsGlobal->Interlace       = GS_INTERLACED;
     gsGlobal->Field           = GS_FIELD;
-    gsGlobal->Width           = 640;
-    gsGlobal->Height          = 448;
+    gsGlobal->Width           = SCREEN_W;
+    gsGlobal->Height          = SCREEN_H;
     gsGlobal->PSM             = GS_PSM_CT32;
     gsGlobal->PSMZ            = GS_PSMZ_16;
     gsGlobal->ZBuffering      = GS_SETTING_OFF;
@@ -26,14 +59,21 @@ int main(void) {
     gsKit_init_screen(gsGlobal);
     gsKit_mode_switch(gsGlobal, GS_ONESHOT);
 
-    while (1) {
-        gsKit_clear(gsGlobal, GS_SETREG_RGBAQ(0, 0, 40, 0x80, 0));
+    input_init();
+    game_init(&gs);
 
-        // Dreptunghi rosu mare in centru
-        gsKit_prim_sprite(gsGlobal,
-            200.0f, 150.0f,
-            440.0f, 300.0f,
-            1, GS_SETREG_RGBAQ(255, 0, 0, 0x80, 0));
+    while (1) {
+        input_update(&gs);
+
+        if (gs.state == STATE_ROUND_END) {
+            if (input_pressed(&gs, 0, PAD_START) ||
+                input_pressed(&gs, 1, PAD_START)) {
+                game_init(&gs);
+            }
+        }
+
+        game_tick(&gs);
+        game_render(&gs, gsGlobal);
 
         gsKit_queue_exec(gsGlobal);
         gsKit_sync_flip(gsGlobal);
