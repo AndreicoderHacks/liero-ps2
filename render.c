@@ -329,7 +329,6 @@ void game_render(GameState *gs, GSGLOBAL *g) {
     if (camY > WORLD_H - SCREEN_H / 2) camY = WORLD_H - SCREEN_H / 2;
 
     render_world(g, gs, camX, camY);
-    gsKit_queue_exec(g);   // flush dupa teren
     render_particles(g, gs, camX, camY);
     render_projectiles(g, gs, camX, camY);
     render_player(g, &gs->players[0], camX, camY, 0);
