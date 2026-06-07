@@ -83,23 +83,10 @@ int main(void) {
     gsKit_mode_switch(gsGlobal, GS_PERSISTENT);
 
     input_init();
-    // sfx_init() dezactivat temporar pentru debug
+    sfx_init();
     game_init(&gs);
 
-    // Asteptam pana pad-ul 0 e gata
-    {
-        int timeout = 300;  // max 5 secunde la 60fps
-        while (timeout-- > 0) {
-            int state = padGetState(0, 0);
-            if (state == PAD_STATE_STABLE || state == PAD_STATE_FINDCTP1)
-                break;
-            // Desenam ecran de loading cat asteptam
-            gsKit_clear(gsGlobal, GS_SETREG_RGBAQ(10,10,25,0x80,0));
-            draw_text(gsGlobal, "SE INCARCA...", SCREEN_W/2-78, SCREEN_H/2, COL_GRAY);
-            gsKit_queue_exec(gsGlobal);
-            gsKit_sync_flip(gsGlobal);
-        }
-    }
+
 
     while (1) {
         input_update(&gs);
