@@ -2,27 +2,54 @@
 
 static GameState gs;
 
+// ============================================================
+//  FAZA 1: doar starea meniului — fara world, fara playeri
+// ============================================================
 void game_init(GameState *g) {
-    memset(g, 0, sizeof(GameState));
-    g->state      = STATE_MENU;
-    g->volume     = 7;
-    g->menu.phase = MENU_PHASE_MAIN;
+    memset(&g->state,      0, sizeof(int));
+    memset(&g->volume,     0, sizeof(int));
+    memset(&g->menu,       0, sizeof(MenuState));
+    memset(&g->input,      0, sizeof(InputState));
+    memset(&g->winner,     0, sizeof(int));
+    memset(&g->tickCount,  0, sizeof(int));
+    memset(&g->roundTimer, 0, sizeof(int));
+    g->projectileCount = 0;
+    g->particleCount   = 0;
+    g->state           = STATE_MENU;
+    g->volume          = 7;
+    g->menu.phase      = MENU_PHASE_MAIN;
+    // World si playeri NU se ating aici
 }
 
+// ============================================================
+//  FAZA 2: incarcare world — apelat dupa selectia armelor
+// ============================================================
 void game_start(GameState *g) {
     int i;
 
-    // Teren plat cu memset
-    memset(g->world.solid, 0, sizeof(g->world.solid));
-    memset(g->world.color, 0, sizeof(g->world.color));
+    // Zero doar world (nu tot GameState)
+    memset(g->world.solid, 0, WORLD_W * WORLD_H);
+    memset(g->world.color, 0, WORLD_W * WORLD_H);
+
+    // Teren plat simplu cu memset direct
     int solid_start = (WORLD_H / 2) * WORLD_W;
     int solid_size  = WORLD_W * (WORLD_H / 2);
     memset(&g->world.solid[solid_start], 1, solid_size);
     memset(&g->world.color[solid_start], 2, solid_size);
 
+    // Zero proiectile si particule
+    memset(g->projectiles, 0, sizeof(g->projectiles));
+    memset(g->particles,   0, sizeof(g->particles));
+    g->projectileCount = 0;
+    g->particleCount   = 0;
+    g->tickCount       = 0;
+    g->roundTimer      = ROUND_TIME;
+
+    // Spawn jucatori
     player_init(&g->players[0], 100, WORLD_H/2 - 20, 0);
     player_init(&g->players[1], 500, WORLD_H/2 - 20, 1);
 
+    // Copiem armele alese din meniu
     for (i = 0; i < WEAPONS_PER_PLAYER; i++) {
         g->players[0].weapons[i] = g->menu.selectedWeapons[0][i];
         g->players[1].weapons[i] = g->menu.selectedWeapons[1][i];
@@ -32,13 +59,12 @@ void game_start(GameState *g) {
     g->players[0].selectedWeapon = 0;
     g->players[1].selectedWeapon = 0;
 
-    g->projectileCount = 0;
-    g->particleCount   = 0;
-    g->tickCount       = 0;
-    g->roundTimer      = ROUND_TIME;
-    g->state           = STATE_PLAYING;
+    g->state = STATE_PLAYING;
 }
 
+// ============================================================
+//  TICK
+// ============================================================
 void game_tick(GameState *g) {
     if (g->state != STATE_PLAYING) return;
 
@@ -60,6 +86,9 @@ void game_tick(GameState *g) {
     }
 }
 
+// ============================================================
+//  MAIN
+// ============================================================
 int main(void) {
     SifInitRpc(0);
 
@@ -85,8 +114,6 @@ int main(void) {
     input_init();
     sfx_init();
     game_init(&gs);
-
-
 
     while (1) {
         input_update(&gs);
