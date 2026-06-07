@@ -68,7 +68,6 @@ int main(void) {
     dmaKit_chan_init(DMA_CHANNEL_GIF);
 
     GSGLOBAL *gsGlobal        = gsKit_init_global();
-    gsGlobal->Per_Queue       = 32768;  // queue mai mare pentru teren
     gsGlobal->Mode            = GS_MODE_NTSC;
     gsGlobal->Interlace       = GS_INTERLACED;
     gsGlobal->Field           = GS_FIELD;
