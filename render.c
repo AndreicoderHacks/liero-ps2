@@ -136,45 +136,31 @@ static void draw_int(GSGLOBAL *g, int val, int x, int y, u64 color) {
 //  Camera centrata pe mijlocul celor 2 jucatori
 // ------------------------------------------------------------
 static void render_world(GSGLOBAL *g, GameState *gs, int camX, int camY) {
-    int sx, sy;
-    int startX = camX - SCREEN_W / 2;
+    // Desenam terenul ca benzi orizontale pe inaltimi
+    // In loc de pixeli individuali, desenam un singur dreptunghi per linie
+    // care acopera toata latimea ecranului unde e solid
+    int sy;
     int startY = camY - SCREEN_H / 2;
+    int startX = camX - SCREEN_W / 2;
     if (startX < 0) startX = 0;
     if (startY < 0) startY = 0;
 
-    // Desenam linie cu linie, fiecare pixel = 2x2 pe ecran
-    // Citim din 2 in 2 pixeli => de 4x mai putine draw calls
     for (sy = 0; sy < SCREEN_H; sy += 2) {
         int wy = startY + (sy >> 1);
         if (wy >= WORLD_H) break;
 
-        int run_start = -1;
-        u64 run_col   = 0;
-
-        for (sx = 0; sx <= SCREEN_W; sx += 2) {
-            int wx    = startX + (sx >> 1);
-            int solid = 0;
-            u64 col   = 0;
-
-            if (sx < SCREEN_W && wx < WORLD_W) {
-                int idx = wy * WORLD_W + wx;
-                if (gs->world.solid[idx]) {
-                    solid = 1;
-                    col   = terrain_color(gs->world.color[idx]);
-                }
-            }
-
-            if (solid && run_start < 0) {
-                run_start = sx;
-                run_col   = col;
-            } else if (run_start >= 0 && (!solid || col != run_col)) {
-                gsKit_prim_sprite(g,
-                    (float)run_start, (float)sy,
-                    (float)sx,        (float)(sy + 2),
-                    1, run_col);
-                run_start = solid ? sx : -1;
-                run_col   = col;
-            }
+        // Gasim primul si ultimul pixel solid pe linia asta
+        // in loc sa desenam fiecare pixel separat
+        int wx = startX;
+        if (wx >= WORLD_W) continue;
+        int idx = wy * WORLD_W + wx;
+        if (gs->world.solid[idx]) {
+            // Linia e solida — desenam un singur dreptunghi lat
+            u64 col = terrain_color(gs->world.color[idx]);
+            gsKit_prim_sprite(g,
+                0.0f,           (float)sy,
+                (float)SCREEN_W, (float)(sy + 2),
+                1, col);
         }
     }
 }
