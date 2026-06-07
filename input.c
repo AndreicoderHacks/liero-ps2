@@ -11,12 +11,7 @@ void input_init(void) {
     padPortOpen(0, 0, padBuf[0]);
     padPortOpen(1, 0, padBuf[1]);
 
-    // Wait 120 iteratii ca in Minicraft — asta e secretul
-    int i;
-    for (i = 0; i < 120; i++) {
-        padGetState(0, 0);
-        padGetState(1, 0);
-    }
+
 }
 
 void input_update(GameState *gs) {

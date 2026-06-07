@@ -107,6 +107,7 @@ void menu_render(GSGLOBAL *g, GameState *gs) {
         draw_text(g, "UP/DOWN=NAVIGA  CROSS=SELECT",
                   SCREEN_W/2-168, SCREEN_H-30, COL_DARK_GRAY);
 
+
     } else if (m->phase == MENU_PHASE_P1_SELECT ||
                m->phase == MENU_PHASE_P2_SELECT) {
         int pidx = (m->phase == MENU_PHASE_P1_SELECT) ? 0 : 1;
