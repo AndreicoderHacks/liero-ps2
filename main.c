@@ -19,59 +19,66 @@ void game_init(GameState *g) {
 
 void game_start(GameState *g) {
     int i;
-    memset(g->world.solid, 0, WORLD_W * WORLD_H);
-    memset(g->world.color, 0, WORLD_W * WORLD_H);
-    int solid_start = (WORLD_H / 2) * WORLD_W;
-    int solid_size  = WORLD_W * (WORLD_H / 2);
-    memset(&g->world.solid[solid_start], 1, solid_size);
-    memset(&g->world.color[solid_start], 2, solid_size);
+    // FIX: world_generate in loc de teren plat
+    world_generate(&g->world);
     memset(g->projectiles, 0, sizeof(g->projectiles));
     memset(g->particles,   0, sizeof(g->particles));
     g->projectileCount = 0;
     g->particleCount   = 0;
     g->tickCount       = 0;
     g->roundTimer      = ROUND_TIME;
-    player_init(&g->players[0], 100, WORLD_H/2 - 20, 0);
-    player_init(&g->players[1], 500, WORLD_H/2 - 20, 1);
+
+    // Spawn jucatori deasupra terenului
+    player_init(&g->players[0], 120, 40, 0);
+    player_init(&g->players[1], 520, 40, 1);
+
+    // FIX: copiem armele din meniu corect
     for (i = 0; i < WEAPONS_PER_PLAYER; i++) {
         g->players[0].weapons[i] = g->menu.selectedWeapons[0][i];
         g->players[1].weapons[i] = g->menu.selectedWeapons[1][i];
     }
     g->players[0].weaponCount    = WEAPONS_PER_PLAYER;
     g->players[1].weaponCount    = WEAPONS_PER_PLAYER;
+    // FIX: selectedWeapon = index in weapons[], nu weapon ID
     g->players[0].selectedWeapon = 0;
     g->players[1].selectedWeapon = 0;
+
     g->state = STATE_PLAYING;
 }
 
 void game_tick(GameState *g) {
-    // Pauza
-    if (input_pressed(g, 0, PAD_START) || input_pressed(g, 1, PAD_START)) {
-        if (g->state == STATE_PLAYING) {
-            g->state = STATE_PAUSED;
-            g->menu.pauseCursor = 0;
-            return;
-        } else if (g->state == STATE_PAUSED) {
-            g->state = STATE_PLAYING;
-            return;
-        } else if (g->state == STATE_ROUND_END) {
-            g->state      = STATE_MENU;
-            g->menu.phase = MENU_PHASE_MAIN;
-            return;
-        }
-    }
-
-    if (g->state == STATE_PAUSED) {
-        pause_tick(g);
-        return;
-    }
-
+    // FIX: START nu face nimic in meniu
     if (g->state == STATE_MENU) {
         menu_tick(g);
         return;
     }
 
+    if (g->state == STATE_PAUSED) {
+        // FIX: START din pauza = continua
+        if (input_pressed(g, 0, PAD_START) || input_pressed(g, 1, PAD_START)) {
+            g->state = STATE_PLAYING;
+            return;
+        }
+        pause_tick(g);
+        return;
+    }
+
+    if (g->state == STATE_ROUND_END) {
+        if (input_pressed(g, 0, PAD_START) || input_pressed(g, 1, PAD_START)) {
+            g->state      = STATE_MENU;
+            g->menu.phase = MENU_PHASE_MAIN;
+        }
+        return;
+    }
+
     if (g->state != STATE_PLAYING) return;
+
+    // FIX: START in joc = pauza
+    if (input_pressed(g, 0, PAD_START) || input_pressed(g, 1, PAD_START)) {
+        g->state = STATE_PAUSED;
+        g->menu.pauseCursor = 0;
+        return;
+    }
 
     g->tickCount++;
     player_tick(g, 0);
@@ -108,10 +115,9 @@ int main(void) {
     gsKit_mode_switch(gsGlobal, GS_ONESHOT);
 
     input_init();
-    // sfx_init(); // dezactivat
+    // sfx_init dezactivat — cauzeaza crash
     game_init(&gs);
 
-    // Exact ca Minicraft — loop simplu fara switch
     while (1) {
         input_update(&gs);
         game_tick(&gs);

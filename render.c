@@ -1,11 +1,10 @@
 #include "liero.h"
 
 // ============================================================
-//  RENDER.C — Render lume, jucatori, HUD
+//  RENDER.C
 // ============================================================
 
-// ---- Font 5x7 minimal (ASCII 32-90) ----
-// Fiecare caracter = 5 bytes, fiecare byte = un rand de 5 pixeli (bitmask)
+// Font 5x7 — fiecare caracter = 5 bytes
 static const u8 font5x7[][5] = {
     {0x00,0x00,0x00,0x00,0x00}, // ' '
     {0x00,0x00,0x5F,0x00,0x00}, // '!'
@@ -68,20 +67,16 @@ static const u8 font5x7[][5] = {
     {0x61,0x51,0x49,0x45,0x43}, // 'Z'
 };
 
-// ---- Culori teren dupa index ----
 static u64 terrain_color(u8 col_idx) {
     switch (col_idx) {
         case 1: return COL_DIRT;
         case 2: return COL_GRAY;
         case 3: return COL_BROWN;
-        case 4: return GS_SETREG_RGBAQ(80, 50, 20, 0x80, 0);
+        case 4: return GS_SETREG_RGBAQ(80,50,20,0x80,0);
         default: return COL_DARK_GRAY;
     }
 }
 
-// ------------------------------------------------------------
-//  draw_rect
-// ------------------------------------------------------------
 void draw_rect(GSGLOBAL *g, int x, int y, int w, int h, u64 color) {
     gsKit_prim_sprite(g,
         (float)x,       (float)y,
@@ -89,18 +84,23 @@ void draw_rect(GSGLOBAL *g, int x, int y, int w, int h, u64 color) {
         1, color);
 }
 
-// ------------------------------------------------------------
-//  draw_char — 5x7 font, 2x scale
-// ------------------------------------------------------------
+// FIX: draw_char foloseste un singur sprite per pixel — dar limitat la 2x2
+// Ca sa reducem draw calls, desenam caracterul ca un singur sprite per coloana
 void draw_char(GSGLOBAL *g, char c, int x, int y, u64 color) {
     if (c < 32 || c > 90) c = '?';
     int idx = c - 32;
-    int col, row;
+    int col;
     for (col = 0; col < 5; col++) {
         u8 bits = font5x7[idx][col];
+        if (!bits) continue;
+        // Desenam fiecare bit ca pixel 2x2
+        int row;
         for (row = 0; row < 7; row++) {
             if (bits & (1 << row)) {
-                draw_rect(g, x + col*2, y + row*2, 2, 2, color);
+                gsKit_prim_sprite(g,
+                    (float)(x + col*2),     (float)(y + row*2),
+                    (float)(x + col*2 + 2), (float)(y + row*2 + 2),
+                    1, color);
             }
         }
     }
@@ -116,7 +116,6 @@ void draw_text(GSGLOBAL *g, const char *str, int x, int y, u64 color) {
     }
 }
 
-// ---- Numere rapide (evita sprintf) ----
 static void draw_int(GSGLOBAL *g, int val, int x, int y, u64 color) {
     char buf[12];
     int i = 0;
@@ -131,17 +130,11 @@ static void draw_int(GSGLOBAL *g, int val, int x, int y, u64 color) {
     draw_text(g, buf, x, y, color);
 }
 
-// ------------------------------------------------------------
-//  render_world — deseneaza terenul vizibil pe ecran
-//  Camera centrata pe mijlocul celor 2 jucatori
-// ------------------------------------------------------------
+// FIX: render_world cu run-length encoding corect
 static void render_world(GSGLOBAL *g, GameState *gs, int camX, int camY) {
-    // Desenam terenul ca benzi orizontale pe inaltimi
-    // In loc de pixeli individuali, desenam un singur dreptunghi per linie
-    // care acopera toata latimea ecranului unde e solid
-    int sy;
-    int startY = camY - SCREEN_H / 2;
+    int sx, sy;
     int startX = camX - SCREEN_W / 2;
+    int startY = camY - SCREEN_H / 2;
     if (startX < 0) startX = 0;
     if (startY < 0) startY = 0;
 
@@ -149,166 +142,156 @@ static void render_world(GSGLOBAL *g, GameState *gs, int camX, int camY) {
         int wy = startY + (sy >> 1);
         if (wy >= WORLD_H) break;
 
-        // Gasim primul si ultimul pixel solid pe linia asta
-        // in loc sa desenam fiecare pixel separat
-        int wx = startX;
-        if (wx >= WORLD_W) continue;
-        int idx = wy * WORLD_W + wx;
-        if (gs->world.solid[idx]) {
-            // Linia e solida — desenam un singur dreptunghi lat
-            u64 col = terrain_color(gs->world.color[idx]);
-            gsKit_prim_sprite(g,
-                0.0f,           (float)sy,
-                (float)SCREEN_W, (float)(sy + 2),
-                1, col);
+        int run_start = -1;
+        u64 run_col   = 0;
+
+        for (sx = 0; sx <= SCREEN_W; sx += 2) {
+            int wx    = startX + (sx >> 1);
+            int solid = 0;
+            u64 col   = 0;
+
+            if (sx < SCREEN_W && wx < WORLD_W) {
+                int tidx = wy * WORLD_W + wx;
+                if (gs->world.solid[tidx]) {
+                    solid = 1;
+                    col   = terrain_color(gs->world.color[tidx]);
+                }
+            }
+
+            if (solid && run_start < 0) {
+                run_start = sx;
+                run_col   = col;
+            } else if (run_start >= 0 && (!solid || col != run_col)) {
+                gsKit_prim_sprite(g,
+                    (float)run_start, (float)sy,
+                    (float)sx,        (float)(sy + 2),
+                    1, run_col);
+                run_start = solid ? sx : -1;
+                run_col   = col;
+            }
         }
     }
 }
 
-// ------------------------------------------------------------
-//  render_player
-// ------------------------------------------------------------
-static void render_player(GSGLOBAL *g, Player *pl, int camX, int camY,
-                           int idx) {
-    if (!pl->alive) return;
+// FIX: sin table e globala/statica — nu pe stack
+static const short g_stab[256] = {
+      0,   6,  13,  19,  25,  31,  38,  44,
+     50,  56,  62,  68,  74,  80,  86,  92,
+     98, 104, 109, 115, 121, 126, 132, 137,
+    142, 147, 152, 157, 162, 167, 171, 176,
+    180, 185, 189, 193, 197, 201, 205, 208,
+    212, 215, 219, 222, 225, 228, 231, 234,
+    236, 238, 241, 243, 245, 247, 248, 250,
+    251, 252, 253, 254, 255, 255, 256, 256,
+    256, 256, 256, 255, 255, 254, 253, 252,
+    251, 250, 248, 247, 245, 243, 241, 238,
+    236, 234, 231, 228, 225, 222, 219, 215,
+    212, 208, 205, 201, 197, 193, 189, 185,
+    180, 176, 171, 167, 162, 157, 152, 147,
+    142, 137, 132, 126, 121, 115, 109, 104,
+     98,  92,  86,  80,  74,  68,  62,  56,
+     50,  44,  38,  31,  25,  19,  13,   6,
+      0,  -6, -13, -19, -25, -31, -38, -44,
+    -50, -56, -62, -68, -74, -80, -86, -92,
+    -98,-104,-109,-115,-121,-126,-132,-137,
+   -142,-147,-152,-157,-162,-167,-171,-176,
+   -180,-185,-189,-193,-197,-201,-205,-208,
+   -212,-215,-219,-222,-225,-228,-231,-234,
+   -236,-238,-241,-243,-245,-247,-248,-250,
+   -251,-252,-253,-254,-255,-255,-256,-256,
+   -256,-256,-256,-255,-255,-254,-253,-252,
+   -251,-250,-248,-247,-245,-243,-241,-238,
+   -236,-234,-231,-228,-225,-222,-219,-215,
+   -212,-208,-205,-201,-197,-193,-189,-185,
+   -180,-176,-171,-167,-162,-157,-152,-147,
+   -142,-137,-132,-126,-121,-115,-109,-104,
+    -98, -92, -86, -80, -74, -68, -62, -56,
+    -50, -44, -38, -31, -25, -19, -13,  -6,
+};
 
+static void render_player(GSGLOBAL *g, Player *pl, int camX, int camY, int idx) {
+    if (!pl->alive) return;
     int px = (pl->x >> 4) - camX + SCREEN_W / 2;
     int py = (pl->y >> 4) - camY + SCREEN_H / 2;
-
-    // Cliping simplu
     if (px < -10 || px > SCREEN_W + 10) return;
     if (py < -10 || py > SCREEN_H + 10) return;
 
     u64 col = (idx == 0) ? COL_P1 : COL_P2;
+    if (pl->hurtTimer > 0 && (pl->hurtTimer % 4) < 2) col = COL_WHITE;
 
-    // Corp: dreptunghi 6x10
-    if (pl->hurtTimer > 0 && (pl->hurtTimer % 4) < 2) {
-        col = COL_WHITE;  // flash la hurt
-    }
     draw_rect(g, px - 3, py - 5, 6, 10, col);
+    draw_rect(g, px - 2, py - 9, 4,  4, col);
 
-    // Cap: dreptunghi mic deasupra
-    draw_rect(g, px - 2, py - 9, 4, 4, col);
-
-    // Linie de tintire (4 pixeli in directia armei)
-    static const short stab[256] = {
-          0,   6,  13,  19,  25,  31,  38,  44,
-         50,  56,  62,  68,  74,  80,  86,  92,
-         98, 104, 109, 115, 121, 126, 132, 137,
-        142, 147, 152, 157, 162, 167, 171, 176,
-        180, 185, 189, 193, 197, 201, 205, 208,
-        212, 215, 219, 222, 225, 228, 231, 234,
-        236, 238, 241, 243, 245, 247, 248, 250,
-        251, 252, 253, 254, 255, 255, 256, 256,
-        256, 256, 256, 255, 255, 254, 253, 252,
-        251, 250, 248, 247, 245, 243, 241, 238,
-        236, 234, 231, 228, 225, 222, 219, 215,
-        212, 208, 205, 201, 197, 193, 189, 185,
-        180, 176, 171, 167, 162, 157, 152, 147,
-        142, 137, 132, 126, 121, 115, 109, 104,
-         98,  92,  86,  80,  74,  68,  62,  56,
-         50,  44,  38,  31,  25,  19,  13,   6,
-          0,  -6, -13, -19, -25, -31, -38, -44,
-        -50, -56, -62, -68, -74, -80, -86, -92,
-        -98,-104,-109,-115,-121,-126,-132,-137,
-       -142,-147,-152,-157,-162,-167,-171,-176,
-       -180,-185,-189,-193,-197,-201,-205,-208,
-       -212,-215,-219,-222,-225,-228,-231,-234,
-       -236,-238,-241,-243,-245,-247,-248,-250,
-       -251,-252,-253,-254,-255,-255,-256,-256,
-       -256,-256,-256,-255,-255,-254,-253,-252,
-       -251,-250,-248,-247,-245,-243,-241,-238,
-       -236,-234,-231,-228,-225,-222,-219,-215,
-       -212,-208,-205,-201,-197,-193,-189,-185,
-       -180,-176,-171,-167,-162,-157,-152,-147,
-       -142,-137,-132,-126,-121,-115,-109,-104,
-        -98, -92, -86, -80, -74, -68, -62, -56,
-        -50, -44, -38, -31, -25, -19, -13,  -6,
-    };
-    int ax = (stab[(pl->aimAngle + 64) & 0xFF] * 8) >> 8;
-    int ay = (stab[pl->aimAngle & 0xFF]         * 8) >> 8;
+    // Indicator directie arma
+    int ax = (g_stab[(pl->aimAngle + 64) & 0xFF] * 8) >> 8;
+    int ay = (g_stab[pl->aimAngle & 0xFF]         * 8) >> 8;
     draw_rect(g, px + ax - 1, py + ay - 1, 2, 2, COL_YELLOW);
 }
 
-// ------------------------------------------------------------
-//  render_projectiles
-// ------------------------------------------------------------
-static void render_projectiles(GSGLOBAL *g, GameState *gs,
-                                int camX, int camY) {
+static void render_projectiles(GSGLOBAL *g, GameState *gs, int camX, int camY) {
     int i;
     for (i = 0; i < MAX_PROJECTILES; i++) {
         Projectile *pr = &gs->projectiles[i];
         if (!pr->alive) continue;
         int px = (pr->x >> 4) - camX + SCREEN_W / 2;
         int py = (pr->y >> 4) - camY + SCREEN_H / 2;
-        if (px < 0 || px >= SCREEN_W) continue;
-        if (py < 0 || py >= SCREEN_H) continue;
+        if (px < 0 || px >= SCREEN_W || py < 0 || py >= SCREEN_H) continue;
         draw_rect(g, px - 1, py - 1, 3, 3, pr->color);
     }
 }
 
-// ------------------------------------------------------------
-//  render_particles
-// ------------------------------------------------------------
-static void render_particles(GSGLOBAL *g, GameState *gs,
-                              int camX, int camY) {
+static void render_particles(GSGLOBAL *g, GameState *gs, int camX, int camY) {
     int i;
     for (i = 0; i < MAX_PARTICLES; i++) {
         Particle *p = &gs->particles[i];
         if (!p->alive) continue;
         int px = (p->x >> 4) - camX + SCREEN_W / 2;
         int py = (p->y >> 4) - camY + SCREEN_H / 2;
-        if (px < 0 || px >= SCREEN_W) continue;
-        if (py < 0 || py >= SCREEN_H) continue;
+        if (px < 0 || px >= SCREEN_W || py < 0 || py >= SCREEN_H) continue;
         draw_rect(g, px, py, 2, 2, p->color);
     }
 }
 
-// ------------------------------------------------------------
-//  render_hud
-// ------------------------------------------------------------
 static void render_hud(GSGLOBAL *g, GameState *gs) {
-    // P1 HUD - stanga sus
+    // FIX: weapon_getName primeste weapon ID, nu index
+    int w0 = gs->players[0].weapons[gs->players[0].selectedWeapon];
+    int w1 = gs->players[1].weapons[gs->players[1].selectedWeapon];
+
     draw_text(g, "P1", 8, 8, COL_P1);
     draw_rect(g, 8, 24, 100, 8, COL_DARK_GRAY);
     draw_rect(g, 8, 24, gs->players[0].health, 8, COL_P1);
-    draw_text(g, weapon_getName(gs->players[0].selectedWeapon), 8, 36, COL_WHITE);
+    draw_text(g, weapon_getName(w0), 8, 36, COL_WHITE);
 
-    // P2 HUD - dreapta sus
     draw_text(g, "P2", SCREEN_W - 30, 8, COL_P2);
     draw_rect(g, SCREEN_W - 108, 24, 100, 8, COL_DARK_GRAY);
     draw_rect(g, SCREEN_W - 108, 24, gs->players[1].health, 8, COL_P2);
-    draw_text(g, weapon_getName(gs->players[1].selectedWeapon),
-              SCREEN_W - 108, 36, COL_WHITE);
+    draw_text(g, weapon_getName(w1), SCREEN_W - 108, 36, COL_WHITE);
 
-    // Timer runda - centru sus
     int secs = gs->roundTimer / 60;
     draw_int(g, secs, SCREEN_W / 2 - 12, 8, COL_YELLOW);
 }
 
-// ------------------------------------------------------------
-//  render_round_end
-// ------------------------------------------------------------
 static void render_round_end(GSGLOBAL *g, GameState *gs) {
     draw_rect(g, SCREEN_W/2 - 80, SCREEN_H/2 - 20, 160, 40, COL_BLACK);
     if (gs->winner == 0)
         draw_text(g, "P1 WINS", SCREEN_W/2 - 42, SCREEN_H/2 - 10, COL_P1);
     else
         draw_text(g, "P2 WINS", SCREEN_W/2 - 42, SCREEN_H/2 - 10, COL_P2);
-    draw_text(g, "START TO PLAY AGAIN", SCREEN_W/2 - 114, SCREEN_H/2 + 14, COL_WHITE);
+    draw_text(g, "START=MENIU", SCREEN_W/2 - 66, SCREEN_H/2 + 14, COL_WHITE);
 }
 
-// ------------------------------------------------------------
-//  game_render — entry point
-// ------------------------------------------------------------
+// FIX: game_render gestioneaza toate state-urile
 void game_render(GameState *gs, GSGLOBAL *g) {
+    // FIX BUG 1: meniu are propriul render, nu se suprapune cu jocul
+    if (gs->state == STATE_MENU) {
+        menu_render(g, gs);
+        return;
+    }
+
     gsKit_clear(g, COL_SKY);
 
-    // Camera: mijlocul dintre cei 2 jucatori
     int camX = ((gs->players[0].x + gs->players[1].x) >> 1) >> 4;
     int camY = ((gs->players[0].y + gs->players[1].y) >> 1) >> 4;
-
-    // Clamp camera
     if (camX < SCREEN_W / 2)           camX = SCREEN_W / 2;
     if (camX > WORLD_W - SCREEN_W / 2) camX = WORLD_W - SCREEN_W / 2;
     if (camY < SCREEN_H / 2)           camY = SCREEN_H / 2;
@@ -321,7 +304,10 @@ void game_render(GameState *gs, GSGLOBAL *g) {
     render_player(g, &gs->players[1], camX, camY, 1);
     render_hud(g, gs);
 
-    if (gs->state == STATE_ROUND_END) {
+    if (gs->state == STATE_ROUND_END)
         render_round_end(g, gs);
-    }
+
+    // Pauza overlay deasupra jocului
+    if (gs->state == STATE_PAUSED)
+        pause_render(g, gs);
 }
