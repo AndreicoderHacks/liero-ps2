@@ -267,8 +267,18 @@ static void render_hud(GSGLOBAL *g, GameState *gs) {
     draw_rect(g, SCREEN_W - 108, 24, gs->players[1].health, 8, COL_P2);
     draw_text(g, weapon_getName(w1), SCREEN_W - 108, 36, COL_WHITE);
 
-    int secs = gs->roundTimer / 60;
-    draw_int(g, secs, SCREEN_W / 2 - 12, 8, COL_YELLOW);
+    // Timer in format MM:SS
+    int total_secs = gs->roundTimer / 60;
+    int mins = total_secs / 60;
+    int secs = total_secs % 60;
+    // Desenam M:SS
+    char timer[8];
+    timer[0] = '0' + mins;
+    timer[1] = ':';
+    timer[2] = '0' + (secs / 10);
+    timer[3] = '0' + (secs % 10);
+    timer[4] = 0;
+    draw_text(g, timer, SCREEN_W/2 - 24, 8, COL_YELLOW);
 }
 
 static void render_round_end(GSGLOBAL *g, GameState *gs) {

@@ -107,9 +107,8 @@ void player_tick(GameState *gs, int idx) {
         pl->selectedWeapon = (pl->selectedWeapon + 1) % pl->weaponCount;
     }
 
-    // Foc
-    if (input_held(gs, pad, PAD_SQUARE) ||
-        input_held(gs, pad, PAD_R1)) {
+    // Foc pe Square
+    if (input_held(gs, pad, PAD_SQUARE)) {
         weapon_fire(gs, idx);
     }
 

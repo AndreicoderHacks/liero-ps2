@@ -25,9 +25,9 @@ void game_start(GameState *g) {
     g->projectileCount = 0;
     g->particleCount   = 0;
     g->tickCount       = 0;
-    g->roundTimer      = ROUND_TIME;
-    player_init(&g->players[0], 120, 40, 0);
-    player_init(&g->players[1], 520, 40, 1);
+    g->roundTimer      = 60 * 120;  // 2 minute
+    player_init(&g->players[0], 120, WORLD_H/2 - 30, 0);
+    player_init(&g->players[1], 520, WORLD_H/2 - 30, 1);
     for (i = 0; i < WEAPONS_PER_PLAYER; i++) {
         g->players[0].weapons[i] = g->menu.selectedWeapons[0][i];
         g->players[1].weapons[i] = g->menu.selectedWeapons[1][i];
