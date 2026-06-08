@@ -82,7 +82,7 @@
 #define SFX_EXPLODE   4
 #define SFX_HURT      5
 #define SFX_COUNT     6
-#define MAX_VOLUME    127
+// MAX_VOLUME definit in audsrv.h ca 100 — nu redefinim
 
 // ============================================================
 //  MENIU
