@@ -19,7 +19,11 @@ void game_init(GameState *g) {
 
 void game_start(GameState *g) {
     int i;
-    world_generate(&g->world);
+    // Teren plat simplu - world_generate craseaza
+    memset(g->world.solid, 0, WORLD_W * WORLD_H);
+    memset(g->world.color, 0, WORLD_W * WORLD_H);
+    memset(&g->world.solid[(WORLD_H/2) * WORLD_W], 1, WORLD_W * (WORLD_H/2));
+    memset(&g->world.color[(WORLD_H/2) * WORLD_W], 2, WORLD_W * (WORLD_H/2));
     memset(g->projectiles, 0, sizeof(g->projectiles));
     memset(g->particles,   0, sizeof(g->particles));
     g->projectileCount = 0;
